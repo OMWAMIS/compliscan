@@ -4,10 +4,27 @@ import docx
 import re
 import pandas as pd
 from io import BytesIO
+from PIL import Image
 
 st.set_page_config(page_title="CompliScan: Contract Analyzer", layout="wide")
-st.title("🛡️ CompliScan: Contract Analyzer")
-st.markdown("Upload contract(s), OSH version reference, and OSH risk evaluator to detect compliance, risk, and key schedules.")
+
+# Apply Safaricom styling
+safaricom_green = "#00A550"
+st.markdown(f"""
+    <style>
+        .main {{
+            background-color: {safaricom_green};
+            color: white;
+        }}
+        header, footer {{visibility: hidden;}}
+        .stDownloadButton {{color: black; background-color: white;}}
+    </style>
+""", unsafe_allow_html=True)
+
+# Load and show Safaricom logo
+st.image("safaricom-logo.jpeg", width=150)
+st.title("CompliScan: Contract Analyzer")
+st.markdown("<h4>Upload contract(s), OSH version reference, and OSH risk evaluator to detect compliance, risk, and key schedules.</h4>", unsafe_allow_html=True)
 
 # Upload interface
 col1, col2, col3 = st.columns(3)
