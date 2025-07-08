@@ -38,8 +38,17 @@ def extract_text(file):
     return ""
 
 def find_osh_version(text):
-    match = re.search(r"OSH\s*Version\s*:?[\s\-]*([0-9.]+)", text, re.IGNORECASE)
-    return match.group(1) if match else "Not Found"
+    # Try various patterns
+    patterns = [
+        r"OSH\s*Version\s*:?[\s\-]*([0-9.]+)",
+        r"Version\s*:?[\s\-]*([0-9.]+).*OSH",  # e.g., "Version 6.0 of the OSH document"
+        r"Occupational\s+Safety\s+and\s+Health\s+Schedule.*Version\s*:?[\s\-]*([0-9.]+)"
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return match.group(1)
+    return "Not Found"
 
 def classify_risk(text):
     for level, keywords in risk_keywords.items():
