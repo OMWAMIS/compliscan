@@ -5,12 +5,12 @@ import re
 import pandas as pd
 from io import BytesIO
 
-# Page configuration
+# ------------------ SETUP ------------------
 st.set_page_config(page_title="CompliScan: Contract Analyzer", layout="wide")
 st.title("🛡️ CompliScan: Contract Analyzer")
 st.markdown("Upload contract(s) and current OSH version to detect compliance, risk, and key schedules.")
 
-# Upload columns
+# Upload area
 col1, col2 = st.columns(2)
 
 with col1:
@@ -19,20 +19,23 @@ with col1:
 with col2:
     osh_file = st.file_uploader("📘 Upload Current OSH Reference", type=["pdf", "docx"])
 
-# Schedules to look for
+# ------------------ SETTINGS ------------------
+
+# Key schedules to detect
 key_schedules = [
     "PRICING", "SCOPE OF WORK", "SLA", "SAFETY OSH", "SUPPLIER CODE OF CONDUCT",
     "DOCUMENT VERSION OSH", "DOCUMENT VERSION CODE OF CONDUCT",
     "LIQUIDATED DAMAGES", "PAYMENT TERMS", "INCOTERMS"
 ]
 
-# Risk keywords
+# Risk classification
 risk_keywords = {
     "HIGH": ["working at height", "confined spaces", "electrical", "fiber splicing", "explosive", "hot works"],
     "MEDIUM": ["maintenance", "installation", "driving", "repairs", "testing"],
     "LOW": ["cleaning", "administration", "delivery", "inspection"]
 }
 
+# ------------------ FUNCTIONS ------------------
 
 def extract_text(file):
     if file.name.endswith(".pdf"):
@@ -42,7 +45,6 @@ def extract_text(file):
         doc = docx.Document(file)
         return "\n".join([p.text for p in doc.paragraphs])
     return ""
-
 
 def find_osh_version(text):
     patterns = [
@@ -56,14 +58,12 @@ def find_osh_version(text):
             return match.group(1)
     return "Not Found"
 
-
 def classify_risk(text):
     for level, keywords in risk_keywords.items():
         for kw in keywords:
             if kw.lower() in text.lower():
                 return level
     return "Unknown"
-
 
 def check_schedules(text):
     found = []
@@ -72,11 +72,11 @@ def check_schedules(text):
             found.append(schedule)
     return found
 
+# ------------------ ANALYSIS ------------------
 
 if contract_files and osh_file:
     st.success("✅ Files uploaded. Analyzing...")
 
-    # Process the uploaded OSH file
     osh_text = extract_text(osh_file)
     current_osh_version = find_osh_version(osh_text)
 
@@ -89,7 +89,7 @@ if contract_files and osh_file:
     for file in contract_files:
         contract_text = extract_text(file)
         contract_version = find_osh_version(contract_text)
-        compliance = "✅ Compliant" if contract_version == current_osh_version else "❌ Not Compliant"
+        compliance = "✅ Compliant" if contract_version == current_osh_version and contract_version != "Not Found" else "❌ Not Compliant"
         risk = classify_risk(contract_text)
         schedules_found = check_schedules(contract_text)
 
@@ -113,7 +113,7 @@ if contract_files and osh_file:
             st.markdown(f"**Schedules Found:** {', '.join(schedules_found) if schedules_found else 'None'}`")
             st.text_area("📑 Contract Preview", contract_text[:1500], height=200)
 
-    # Summary
+    # ------------------ SUMMARY ------------------
     st.subheader("📋 Compliance Summary")
     st.success(f"✅ Compliant Contracts: {len(compliant_contracts)}")
     st.error(f"❌ Non-Compliant Contracts: {len(non_compliant_contracts)}")
@@ -123,19 +123,20 @@ if contract_files and osh_file:
         for nc in non_compliant_contracts:
             st.markdown(f"- ❌ {nc}")
 
-    # Export to Excel
+    # ------------------ EXCEL EXPORT ------------------
     df = pd.DataFrame(results)
 
     buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Contract Analysis")
         writer.close()
-        st.download_button(
-            label="📥 Download Excel Report",
-            data=buffer.getvalue(),
-            file_name="compliance_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+
+    st.download_button(
+        label="📥 Download Excel Report",
+        data=buffer.getvalue(),
+        file_name="compliance_report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 else:
     st.warning("⬆️ Please upload contract(s) and OSH reference to start.")
