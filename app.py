@@ -1,7 +1,9 @@
 import streamlit as st
-import fitz  # PyMuPDF for PDF
+import fitz  # PyMuPDF
 import docx
 import re
+import pandas as pd
+from io import BytesIO
 
 # Page setup
 st.set_page_config(page_title="CompliScan: Contract Analyzer", layout="wide")
@@ -61,10 +63,13 @@ def classify_risk(text):
 
 def check_schedules(text):
     found = []
+    missing = []
     for schedule in key_schedules:
         if schedule.lower() in text.lower():
             found.append(schedule)
-    return found
+        else:
+            missing.append(schedule)
+    return found, missing
 
 # MAIN LOGIC
 if contract_files and osh_file:
@@ -77,10 +82,55 @@ if contract_files and osh_file:
 
     compliant_contracts = []
     non_compliant_contracts = []
+    results = []
 
     for file in contract_files:
         contract_text = extract_text(file)
         contract_version = find_osh_version(contract_text)
         is_compliant = contract_version == current_osh_version and current_osh_version != "Not Found"
         risk = classify_risk(contract_text)
-        schedules_found = check_schedules(contract_text)
+        schedules_found, schedules_missing = check_schedules(contract_text)
+
+        if is_compliant:
+            compliant_contracts.append(file.name)
+        else:
+            non_compliant_contracts.append(file.name)
+
+        # Display
+        with st.expander(f"📄 {file.name}"):
+            st.markdown(f"**OSH Version Detected:** `{contract_version}`")
+            st.markdown(f"**Compliance Status:** {'✅ Compliant' if is_compliant else '❌ Not Compliant'}")
+            st.markdown(f"**Risk Classification:** `{risk}`")
+            st.markdown(f"**Schedules Found:** {', '.join(schedules_found) if schedules_found else 'None'}")
+            st.markdown(f"**❌ Missing Schedules:** {', '.join(schedules_missing) if schedules_missing else 'None'}")
+            st.text_area("📑 Contract Preview", contract_text[:1000], height=200)
+
+        # Save result row
+        results.append({
+            "Contract Name": file.name,
+            "OSH Version": contract_version,
+            "Compliance": "Compliant" if is_compliant else "Not Compliant",
+            "Risk": risk,
+            "Schedules Found": ", ".join(schedules_found),
+            "Schedules Missing": ", ".join(schedules_missing)
+        })
+
+    # Summary
+    st.subheader("📋 Compliance Summary")
+    st.success(f"✅ Compliant Contracts: {len(compliant_contracts)}")
+    st.error(f"❌ Non-Compliant Contracts: {len(non_compliant_contracts)}")
+    if non_compliant_contracts:
+        st.markdown("**Non-Compliant List:**")
+        for nc in non_compliant_contracts:
+            st.markdown(f"- ❌ {nc}")
+
+    # Export to Excel
+    st.subheader("📥 Download Compliance Report")
+    df = pd.DataFrame(results)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name="CompliScan Report")
+    st.download_button("⬇️ Download Excel Report", data=output.getvalue(), file_name="CompliScan_Report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+else:
+    st.warning("⬆️ Please upload contract(s) and OSH reference to start.")
