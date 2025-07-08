@@ -67,8 +67,11 @@ def check_schedules(text):
 if contract_files and osh_file:
     st.success("✅ Files uploaded. Analyzing...")
 
-    osh_text = extract_text(osh_file)
-    current_osh_version = find_osh_version(osh_text)
+    if current_osh_version and current_osh_version in contract_text:
+    compliant_contracts.append(contract_name)
+else:
+    non_compliant_contracts.append(contract_name)
+
 
     st.info(f"📘 Current OSH Version: `{current_osh_version}`")
 
