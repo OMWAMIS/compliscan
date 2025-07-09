@@ -9,27 +9,18 @@ from io import BytesIO
 safaricom_green = "#00A550"
 st.set_page_config(page_title="CompliScan: Contract Analyzer", layout="wide")
 
-# Style override for green background and white text
 st.markdown(f"""
     <style>
         .main {{
             background-color: {safaricom_green};
             color: white;
         }}
-        .stApp {{
-            background-color: {safaricom_green};
-        }}
-        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5 {{
-            color: white !important;
-        }}
-        .stButton>button {{
-            background-color: white;
-            color: black;
-        }}
+        .stApp {{ background-color: {safaricom_green}; }}
+        .stMarkdown h1, .stMarkdown h2, .stMarkdown h3, .stMarkdown h4, .stMarkdown h5 {{ color: white !important; }}
+        .stButton>button {{ background-color: white; color: black; }}
     </style>
 """, unsafe_allow_html=True)
 
-# Show Safaricom logo
 st.image("safaricom-logo.jpeg.jpeg", width=150)
 st.title("CompliScan: Contract Analyzer")
 st.markdown("Upload contract(s), OSH version reference, and OSH risk evaluator to detect compliance, risk, and key schedules.")
@@ -43,11 +34,14 @@ with col2:
 with col3:
     osh_risk_file = st.file_uploader("📕 Upload OSH Risk Evaluator", type=["pdf", "docx"])
 
-# Key clauses to extract
+# Updated required schedules
 key_schedules = [
-    "PRICING", "SCOPE OF WORK", "SLA", "SAFETY OSH", "SUPPLIER CODE OF CONDUCT",
-    "DOCUMENT VERSION OSH", "DOCUMENT VERSION CODE OF CONDUCT",
-    "LIQUIDATED DAMAGES", "PAYMENT TERMS", "INCOTERMS"
+    "PRICING",
+    "SCOPE OF WORK",
+    "SERVICE LEVEL AGREEMENT",
+    "CODE OF CONDUCT",
+    "OSH DOCUMENT VERSION",
+    "CODE OF CONDUCT DOCUMENT VERSION"
 ]
 
 def extract_text(file):
@@ -61,9 +55,9 @@ def extract_text(file):
 
 def find_osh_version(text):
     patterns = [
-        r"OSH\s*Version\s*:?[\s\-]*([0-9.]+)",
-        r"Version\s*:?[\s\-]*([0-9.]+).*OSH",
-        r"Occupational\s+Safety\s+and\s+Health.*Version\s*:?[\s\-]*([0-9.]+)"
+        r"OSH\s*Version\s*:?\s*([0-9.]+)",
+        r"Version\s*:?\s*([0-9.]+).*OSH",
+        r"Occupational\s+Safety\s+and\s+Health.*Version\s*:?\s*([0-9.]+)"
     ]
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
@@ -72,7 +66,9 @@ def find_osh_version(text):
     return "Not Found"
 
 def check_schedules(text):
-    return [s for s in key_schedules if s.lower() in text.lower()]
+    found = [s for s in key_schedules if s.lower() in text.lower()]
+    missing = [s for s in key_schedules if s not in found]
+    return found, missing
 
 def extract_risk_keywords(text):
     risk = {"HIGH": [], "MEDIUM": [], "LOW": []}
@@ -91,7 +87,6 @@ def classify_risk(text, risk_keywords):
                 return level
     return "Unknown"
 
-# Run only if all 3 files are uploaded
 if contract_files and osh_version_file and osh_risk_file:
     st.success("✅ Files uploaded. Analyzing...")
 
@@ -112,21 +107,24 @@ if contract_files and osh_version_file and osh_risk_file:
         contract_version = find_osh_version(contract_text)
         compliance = "✅ Compliant" if contract_version == current_osh_version else "❌ Not Compliant"
         risk = classify_risk(contract_text, risk_keywords)
-        schedules = check_schedules(contract_text)
+        found_schedules, missing_schedules = check_schedules(contract_text)
 
         results.append({
             "Contract Name": file.name,
             "OSH Version": contract_version,
             "Compliance": compliance,
             "Risk Level": risk,
-            "Schedules Found": ", ".join(schedules)
+            "Schedules Found": ", ".join(found_schedules),
+            "Missing Schedules": ", ".join(missing_schedules) if missing_schedules else "None"
         })
 
         with st.expander(f"📄 {file.name}"):
             st.markdown(f"**OSH Version Detected:** `{contract_version}`")
             st.markdown(f"**Compliance Status:** {compliance}")
             st.markdown(f"**Risk Classification:** `{risk}`")
-            st.markdown(f"**Schedules Found:** {', '.join(schedules) if schedules else 'None'}")
+            st.markdown(f"**Schedules Found:** {', '.join(found_schedules) if found_schedules else 'None'}")
+            if missing_schedules:
+                st.warning(f"⚠️ Missing schedules: {', '.join(missing_schedules)}")
             st.text_area("📑 Contract Preview", contract_text[:1500], height=200)
 
     st.subheader("📋 Compliance Summary")
